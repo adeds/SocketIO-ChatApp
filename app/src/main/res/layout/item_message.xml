@@ -6,7 +6,7 @@
         android:paddingTop="@dimen/spacing">
 
     <TextView
-            android:id="@+id/username"
+            android:id="@+id/username_sender"
             style="?android:textAppearanceMedium"
             android:textColor="?android:textColorPrimary"
             android:layout_width="wrap_content"

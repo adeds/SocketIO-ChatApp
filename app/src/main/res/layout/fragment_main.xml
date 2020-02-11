@@ -6,8 +6,8 @@
         android:orientation="vertical"
         tools:context=".MainFragment">
 
-    <android.support.v7.widget.RecyclerView
-            android:id="@+id/messages"
+    <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/messages_rv"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
@@ -29,7 +29,6 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:hint="@string/prompt_message"
-                android:imeActionId="@+id/send"
                 android:imeActionLabel="@string/action_send"
                 android:imeOptions="actionSend"
                 android:inputType="text"
