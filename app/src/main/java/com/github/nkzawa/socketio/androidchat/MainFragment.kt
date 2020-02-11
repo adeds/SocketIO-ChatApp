@@ -15,7 +15,11 @@ import android.widget.TextView.OnEditorActionListener
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.github.nkzawa.socketio.androidchat.Constants.ADD_USER
+import com.github.nkzawa.socketio.androidchat.Constants.MESSAGE
 import com.github.nkzawa.socketio.androidchat.Constants.NEW_MESSAGE
+import com.github.nkzawa.socketio.androidchat.Constants.NUMBER_OF_USER
+import com.github.nkzawa.socketio.androidchat.Constants.USERNAME
 import com.github.nkzawa.socketio.androidchat.Constants.USER_JOINED
 import com.github.nkzawa.socketio.androidchat.Constants.USER_LEFT
 import com.github.nkzawa.socketio.androidchat.Constants.USER_TYPING
@@ -30,12 +34,13 @@ import org.json.JSONObject
  * A chat fragment containing messages view and input form.
  */
 class MainFragment : Fragment() {
-    private val mMessages: MutableList<Message> = mutableListOf()
     private lateinit var mAdapter: MessageAdapter
+    private lateinit var mSocket: Socket
+
+    private val mMessages: MutableList<Message> = mutableListOf()
     private var mTyping = false
     private val mTypingHandler = Handler()
     private var mUsername: String? = null
-    private lateinit var mSocket: Socket
     private var isConnected = true
     // This event fires 1st, before creation of fragment or any views
 // The onAttach method is called when the Fragment instance is associated with an Activity.
@@ -95,14 +100,10 @@ class MainFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-//        mMessagesView = view.findViewById<View>(R.id.messages_rv) as RecyclerView
-//        mMessagesView!!.layoutManager = LinearLayoutManager(activity)
-//        mMessagesView!!.adapter = mAdapter
         messages_rv.apply {
             layoutManager = LinearLayoutManager(activity)
             adapter = mAdapter
         }
-//        mInputMessageView = view.findViewById<View>(R.id.message_input) as EditText
         message_input.setOnEditorActionListener(OnEditorActionListener { _, id, _ ->
             if (id == EditorInfo.IME_ACTION_SEND || id == EditorInfo.IME_NULL) {
                 attemptSend()
@@ -225,41 +226,68 @@ class MainFragment : Fragment() {
         messages_rv.scrollToPosition(mAdapter.itemCount - 1)
     }
 
-    private val onConnect = Emitter.Listener {
+    private val onConnect = Emitter.Listener { args ->
+        args.forEachIndexed { i, it ->
+            Log.e("123-onConnect $i:", it.toString())
+
+            // result example : null, args tidak ada, log tidak muncul
+        }
+
         activity!!.runOnUiThread {
             if (!isConnected) {
-                if (null != mUsername) mSocket.emit("add user", mUsername)
+                if (!mUsername.isNullOrBlank())
+                    mSocket.emit(ADD_USER, mUsername)
+
                 Toast.makeText(activity!!.applicationContext,
                         R.string.connect, Toast.LENGTH_LONG).show()
                 isConnected = true
             }
         }
     }
-    private val onDisconnect = Emitter.Listener {
+    private val onDisconnect = Emitter.Listener { args ->
+        args.forEachIndexed { i, it ->
+            Log.e("123-onDisconnect $i:", it.toString())
+
+            // result example : transport error
+        }
+
         activity!!.runOnUiThread {
-            Log.i(TAG, "diconnected")
             isConnected = false
             Toast.makeText(activity!!.applicationContext,
                     R.string.disconnect, Toast.LENGTH_LONG).show()
         }
     }
-    private val onConnectError = Emitter.Listener {
+    private val onConnectError = Emitter.Listener { args ->
+        args.forEachIndexed { i, it ->
+            Log.e("123-onConnectError $i:", it.toString())
+
+            // result example : io.socket.engineio.client.EngineIOException: xhr poll error
+        }
         activity!!.runOnUiThread {
-            Log.e(TAG, "Error connecting")
             Toast.makeText(activity!!.applicationContext,
                     R.string.error_connect, Toast.LENGTH_LONG).show()
         }
     }
     private val onNewMessage = Emitter.Listener { args ->
+        args.forEachIndexed { i, it ->
+            Log.e("123-onNewMessage $i:", it.toString())
+
+            // result example :
+            //  {
+            //      "username":"hai",
+            //      "message":"new message nih"
+            //  }
+        }
+
         activity!!.runOnUiThread(Runnable {
             val data = args[0] as JSONObject
             val username: String
             val message: String
             try {
-                username = data.getString("username")
-                message = data.getString("message")
+                username = data.getString(USERNAME)
+                message = data.getString(MESSAGE)
             } catch (e: JSONException) {
-                Log.e(TAG, e.message)
+                Log.e("123E-onNewMessage", "${e.message}")
                 return@Runnable
             }
             removeTyping(username)
@@ -267,15 +295,24 @@ class MainFragment : Fragment() {
         })
     }
     private val onUserJoined = Emitter.Listener { args ->
+        args.forEachIndexed { i, it ->
+            Log.e("123-onUserJoined $i:", it.toString())
+
+            // result example :
+            //      {
+            //          "username":"no",
+            //          "numUsers":25
+            //      }
+        }
         activity!!.runOnUiThread(Runnable {
             val data = args[0] as JSONObject
             val username: String
             val numUsers: Int
             try {
-                username = data.getString("username")
-                numUsers = data.getInt("numUsers")
+                username = data.getString(USERNAME)
+                numUsers = data.getInt(NUMBER_OF_USER)
             } catch (e: JSONException) {
-                Log.e(TAG, e.message)
+                Log.e("123E-onUserJoined", "${e.message}")
                 return@Runnable
             }
             addLog(resources.getString(R.string.message_user_joined, username))
@@ -283,6 +320,15 @@ class MainFragment : Fragment() {
         })
     }
     private val onUserLeft = Emitter.Listener { args ->
+        args.forEachIndexed { i, it ->
+            Log.e("123-onUserLeft $i:", it.toString())
+
+            // result example :
+            //      {
+            //          "username":"123123",
+            //          "numUsers":24
+            //       }
+        }
         activity!!.runOnUiThread(Runnable {
             val data = args[0] as JSONObject
             val username: String
@@ -291,7 +337,7 @@ class MainFragment : Fragment() {
                 username = data.getString("username")
                 numUsers = data.getInt("numUsers")
             } catch (e: JSONException) {
-                Log.e(TAG, e.message)
+                Log.e("123E-onUserLeft", "${e.message}")
                 return@Runnable
             }
             addLog(resources.getString(R.string.message_user_left, username))
@@ -300,26 +346,37 @@ class MainFragment : Fragment() {
         })
     }
     private val onTyping = Emitter.Listener { args ->
+        args.forEachIndexed { i, it ->
+            Log.e("123-onTyping $i:", it.toString())
+
+            // result example : {"username":"hai"}
+        }
         activity!!.runOnUiThread(Runnable {
             val data = args[0] as JSONObject
             val username: String
             username = try {
                 data.getString("username")
             } catch (e: JSONException) {
-                Log.e(TAG, e.message)
+                Log.e("123E-onTyping", "${e.message}")
                 return@Runnable
             }
             addTyping(username)
         })
     }
     private val onStopTyping = Emitter.Listener { args ->
+        args.forEachIndexed { i, it ->
+            Log.e("123-onStopTyping $i:", it.toString())
+
+            // result example : {"username":"hai"}
+
+        }
         activity!!.runOnUiThread(Runnable {
             val data = args[0] as JSONObject
             val username: String
             username = try {
                 data.getString("username")
             } catch (e: JSONException) {
-                Log.e(TAG, e.message)
+                Log.e("123E-onStopTyping", "${e.message}")
                 return@Runnable
             }
             removeTyping(username)
@@ -333,7 +390,6 @@ class MainFragment : Fragment() {
     }
 
     companion object {
-        private const val TAG = "MainFragment"
         private const val REQUEST_LOGIN = 0
         private const val TYPING_TIMER_LENGTH = 600
     }
